@@ -6,6 +6,7 @@ import asyncio
 import contextlib
 import logging
 import os
+import shlex
 import shutil
 from pathlib import Path
 
@@ -22,6 +23,10 @@ _CANDIDATES = (
     "/snap/bin/chromium",
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
 )
+
+
+def _truthy(v: str | None) -> bool:
+    return (v or "").strip().lower() in ("1", "true", "yes", "on")
 
 
 def find_chromium(configured: str = "") -> str:
@@ -86,6 +91,18 @@ class ChromiumProcess:
             args[1:1] = ["--headless=new", "--disable-gpu"]
         if hasattr(os, "geteuid") and os.geteuid() == 0:
             args.insert(1, "--no-sandbox")
+        # Container images (Debian chromium inside Docker) frequently have no
+        # usable sandbox: unprivileged user namespaces are blocked and the
+        # setuid helper is not installed. Without --no-sandbox Chromium dies
+        # before opening the DevTools port and the gateway never boots.
+        if _truthy(os.getenv("MUSE2API_CHROMIUM_NO_SANDBOX")):
+            args.insert(1, "--no-sandbox")
+        # Escape hatch for anything else the host needs (proxy flags, locale…).
+        extra = os.getenv("MUSE2API_CHROMIUM_ARGS", "").strip()
+        if extra:
+            for a in shlex.split(extra):
+                if a and a not in args:
+                    args.insert(1, a)
 
         log.info("launching Chromium: %s", self.executable)
         self.proc = await asyncio.create_subprocess_exec(
