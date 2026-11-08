@@ -30,7 +30,7 @@ const LANG_STRINGS = {
     btn: "Read and import",
     steps: `<b>Before you start:</b><br>
       1. Logged in to <a href="https://muse.ai/" target="_blank" style="color:#2fbfab">muse.ai</a> in <b>this browser</b>.<br>
-      2. Gateway URL and Admin Key filled in (from the muse2api dashboard "Accounts" tab).`,
+      2. Gateway URL and Admin Key filled in — a pre-configured download already has them.`,
     foot: `Reads muse.ai cookies via <code>chrome.cookies</code> and POSTs to your gateway. Nothing sent to third parties. Cookies never stored.`,
     noBase: "Please enter the Gateway URL first.",
     noKey: "Please enter the Admin Key first.",
@@ -147,8 +147,14 @@ async function loadCfg() {
   if (c.base) $("base").value = c.base;
   if (c.key) $("key").value = c.key;
   if (c.label) $("label").value = c.label;
+  // Pre-configured build (config.js rewritten by the gateway): fill whatever
+  // storage does not have yet, so the popup works with zero typing.
+  const baked = (typeof window !== "undefined" && window.MUSE2API_DEFAULTS) || {};
+  if (!c.base && baked.base) $("base").value = baked.base;
+  if (!c.key && baked.key) $("key").value = baked.key;
+  if (!c.label && baked.label) $("label").value = baked.label;
   // Auto-detect from active tab if on the dashboard
-  if (!c.base) {
+  if (!$("base").value) {
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       const u = tab && tab.url ? new URL(tab.url) : null;
